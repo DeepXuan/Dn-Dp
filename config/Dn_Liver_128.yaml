@@ -1,13 +1,14 @@
 model:
   cfg_path: ./config/sample_sr3_128_Liver.json
+  pretrained_path: ./Pretrained/Liver_128.pth
 data:
   root: ./test_data/Liver
   input_folder: low
   cond_folder: None
   output_folder: lr_dn
   target_folder: full
-  res: 128
-  len: -1
+  res: 128 # the input images will be first resized to (res, res) befor denoising
+  len: -1 # -1 for testing all images in the input folder
 diffusion:
   ddim: True
   ddim_eta: 1.0

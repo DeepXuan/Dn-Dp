@@ -1,0 +1,51 @@
+{
+    "name": "sample_Chest_256",
+    "phase": "val", // train or val
+    "gpu_ids": [
+        0
+    ],
+    "path": { //set the path
+        "resume_state": "./Pretrained/Chest_256.pth"
+    },
+
+    "model": {
+        "which_model_G": "sr3", // use the ddpm or sr3 network structure
+        "finetune_norm": false,
+        "unet": {
+            "in_channel": 1,
+            "out_channel": 1,
+            "inner_channel": 64,
+            "channel_multiplier": [
+                1,
+                2,
+                4,
+                8,
+                8
+            ],
+            "attn_res": [
+                16
+            ],
+            "res_blocks": 4,
+            "dropout": 0.2
+        },
+        "beta_schedule": { // use munual beta_schedule for acceleration
+            "train": {
+                "schedule": "linear",
+                "n_timestep": 2000,
+                "linear_start": 1e-6,
+                "linear_end": 1e-2
+            },
+            "val": {
+                "schedule": "linear",
+                "n_timestep": 2000,
+                "linear_start": 1e-6,
+                "linear_end": 1e-2
+            }
+        },
+        "diffusion": {
+            "image_size": 256,
+            "channels": 1, //sample channel
+            "conditional": false // unconditional generation or unconditional generation(super_resolution)
+        }
+    }
+}

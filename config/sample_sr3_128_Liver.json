@@ -1,0 +1,50 @@
+{
+    "name": "sample_Liver_128",
+    "phase": "val", // train or val
+    "gpu_ids": [
+        0
+    ],
+    "path": { //set the path
+        "resume_state": "./Pretrained/Liver_128.pth"
+    },
+    "model": {
+        "which_model_G": "sr3", // use the ddpm or sr3 network structure
+        "finetune_norm": false,
+        "unet": {
+            "in_channel": 1,
+            "out_channel": 1,
+            "inner_channel": 64,
+            "channel_multiplier": [
+                1,
+                2,
+                4,
+                8,
+                8
+            ],
+            "attn_res": [
+                16
+            ],
+            "res_blocks": 2,
+            "dropout": 0.2
+        },
+        "beta_schedule": { // use munual beta_schedule for acceleration
+            "train": {
+                "schedule": "linear",
+                "n_timestep": 2000,
+                "linear_start": 1e-6,
+                "linear_end": 1e-2
+            },
+            "val": {
+                "schedule": "linear",
+                "n_timestep": 2000, //200
+                "linear_start": 1e-6, //1e-4
+                "linear_end": 1e-2 // 9e-2
+            }
+        },
+        "diffusion": {
+            "image_size": 128,
+            "channels": 1, //sample channel
+            "conditional": false // unconditional generation or unconditional generation(super_resolution)
+        }
+    }
+}

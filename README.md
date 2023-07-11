@@ -32,7 +32,7 @@ python denoising.py -c ./config/Dn_Chest_256.yaml # Denoise low-resolution chest
 python denoising.py -c ./config/Dn_Chest_256_512.yaml # Denoise low-resolution chest CT images with denoised low-resolution images as conditions  
 ```
 ### 2. Run for your own data
-Place your test data in sub-folders of a root-folder:
+Place your test data in sub-folders of a root-folder.
 ```
 root 
 ├── input_folder # Put your test images here.  
@@ -48,7 +48,7 @@ root: root
   output_folder: output_folder
   target_folder: target_folder
 ```
-Then specify the diffusion models used in the YAML file.
+Specify the diffusion models used in the YAML file.
 ```yaml
 model:
   cfg_path: ./config/sample_sr3_128_Liver.json # unconditional diffusion for abdomen CT images of 128x128

@@ -36,6 +36,7 @@ if __name__ == "__main__":
     else:
         model_cfg['distributed'] = False
 
+    model_cfg['path']['resume_state'] = cfg['model']['pretrained_path']
     root = cfg['data']['root']
     input_folder = cfg['data']['input_folder']
     cond_folder = cfg['data']['cond_folder'] if cfg['data']['cond_folder'] != 'None' else None

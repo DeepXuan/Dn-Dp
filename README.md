@@ -13,11 +13,11 @@ This repository contains the official implementation of the paper "Diffusion Pro
 pip install -r requirements.txt
 ```
 ## Pre-trained Models
-Download from https://drive.google.com/drive/folders/1sHWtDlUCO-4cb-v_ijR1i3c2PYqB44xs?usp=sharing
+We share our pre-trained cascaded diffusion models. Please download from https://drive.google.com/drive/folders/1sHWtDlUCO-4cb-v_ijR1i3c2PYqB44xs?usp=sharing.
 
 ## How to run
 ### 1. Run for Test data
-We prepare 2 abdomen CT images and 2 Chest CT images in folder ./test_data. 
+We prepare 2 abdomen CT images and 2 Chest CT images in folder ./test_data. Run the following commands for testing.
 
 ```python
 python denoising.py -c ./config/Dn_liver_128.yaml # Denoise low-resolution abdomen CT images 

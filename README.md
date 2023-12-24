@@ -2,6 +2,20 @@
 
 This repository contains the official implementation of the paper "Diffusion Probabilistic Priors for Zero-Shot Low-Dose CT Image Denoising" by [Xuan Liu et al.] https://arxiv.org/abs/2305.15887. The paper introduces a novel approach for denoising low-dose CT images using diffusion priors.
 
+## Update (2023.12.24): upload training codes (in a new branch).
+To train, run
+```python
+python sr_training.py -c config/sr_sr3_128_512_Liver_training.json -p train # train a super-resolution diffusion model
+```
+or 
+```python
+python sample_training.py -c config/sample_sr3_128_Liver_training.json -p train # train a unconditional diffusion model
+```
+When training a high-resolution diffusion model, you may encounter unsatisfactory results. Based on my experience, here are some suggestions:
+1. Employ patching techniques as mentioned in https://arxiv.org/abs/2207.04316 
+2. Explore different model parameterization methods (adjusting the meaning of the U-Net's output), accroding to Section 4 of https://arxiv.org/abs/2202.00512
+3. Simply increase the depth of U-Net (as I do for my shared pre-trained models).
+
 ## Test Environment
 - OS: Windows 11
 - GPU: NVIDIA RTX 3090

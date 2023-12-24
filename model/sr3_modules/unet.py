@@ -170,7 +170,10 @@ class UNet(nn.Module):
         res_blocks=3,
         dropout=0,
         with_noise_level_emb=True,
-        image_size=128
+        image_size=128,
+
+        patch_n=1,
+        patch_n_cond=1,
     ):
         super().__init__()
 
@@ -185,6 +188,14 @@ class UNet(nn.Module):
         else:
             noise_level_channel = None
             self.noise_level_mlp = None
+
+        self.patch_n = patch_n
+        self.patch_n_cond = patch_n_cond
+        if in_channel == 1:
+            in_channel = in_channel * patch_n * patch_n
+        elif in_channel == 2:
+            in_channel = patch_n * patch_n + patch_n_cond * patch_n_cond # + 1
+        out_channel = out_channel * patch_n * patch_n
 
         num_mults = len(channel_mults)
         pre_channel = inner_channel
@@ -232,9 +243,43 @@ class UNet(nn.Module):
 
         self.final_conv = Block(pre_channel, default(out_channel, in_channel), groups=norm_groups)
 
+    def to_patches(self, x):
+        p = self.patch_n
+        B, C, H, W = x.shape
+
+        x = x.permute(0, 2, 3, 1).reshape(B, H, W//p, C*p)
+        x = x.permute(0, 2, 1, 3).reshape(B, W//p, H//p, C*p*p)
+        return x.permute(0, 3, 2, 1)
+
+    def from_patches(self, x):
+        p = self.patch_n
+        B, C, H, W = x.shape
+
+        x = x.permute(0,3,2,1).reshape(B, W, H*p, C//p)
+        x = x.permute(0,2,1,3).reshape(B, H*p, W*p, C//(p*p))
+        return x.permute(0, 3, 1, 2)
+    
+    def to_patches_cond(self, x):
+        p = self.patch_n_cond
+        B, C, H, W = x.shape
+
+        x = x.permute(0, 2, 3, 1).reshape(B, H, W//p, C*p)
+        x = x.permute(0, 2, 1, 3).reshape(B, W//p, H//p, C*p*p)
+        return x.permute(0, 3, 2, 1)
+
+
     def forward(self, x, time):
         t = self.noise_level_mlp(time) if exists(
             self.noise_level_mlp) else None
+        
+        if type(x) == tuple:
+            x1 = self.to_patches(x[1])
+            x0 = self.to_patches_cond(x[0])
+            x = torch.cat([x0, x1], dim=1)
+            # x = torch.cat([x[0], x[1]], dim=1)
+            # x = self.to_patches(x)
+        else:
+            x = self.to_patches(x)
 
         feats = []
         for layer in self.downs:
@@ -256,4 +301,148 @@ class UNet(nn.Module):
             else:
                 x = layer(x)
 
-        return self.final_conv(x)
+        outs =  self.final_conv(x)
+        return self.from_patches(outs)
+
+
+class UNet_parallel(nn.Module):
+    def __init__(
+        self,
+        in_channel=6,
+        out_channel=3,
+        inner_channel=32,
+        norm_groups=32,
+        channel_mults=(1, 2, 4, 8, 8),
+        attn_res=(8),
+        res_blocks=3,
+        dropout=0,
+        with_noise_level_emb=True,
+        image_size=128,
+    ):
+        super().__init__()
+        devices = [torch.device("cuda:0"), torch.device("cuda:1"), torch.device("cuda:2")]
+        if with_noise_level_emb:
+            noise_level_channel = inner_channel
+            self.noise_level_mlp = nn.Sequential(
+                PositionalEncoding(inner_channel),
+                nn.Linear(inner_channel, inner_channel * 4),
+                Swish(),
+                nn.Linear(inner_channel * 4, inner_channel)
+            ).to(devices[0])
+        else:
+            noise_level_channel = None
+            self.noise_level_mlp = None
+
+        num_mults = len(channel_mults)
+        pre_channel = inner_channel
+        feat_channels = [pre_channel]
+        now_res = image_size
+        
+        downs = [nn.Conv2d(in_channel, inner_channel,
+                           kernel_size=3, padding=1).to(devices[0])]
+        
+        for ind in range(num_mults):
+            if ind < 1:
+                device = devices[0]
+            elif ind < 4:
+                device = devices[1]
+            else:
+                device = devices[2]
+            
+            is_last = (ind == num_mults - 1)
+            use_attn = (now_res in attn_res)
+            channel_mult = inner_channel * channel_mults[ind]
+            for _ in range(0, res_blocks):
+                downs.append(ResnetBlocWithAttn(
+                    pre_channel, channel_mult, noise_level_emb_dim=noise_level_channel, norm_groups=norm_groups, dropout=dropout, with_attn=use_attn).to(device))
+                feat_channels.append(channel_mult)
+                pre_channel = channel_mult
+                # if ind < 5:
+                #     for p in downs[-1].parameters():
+                #         p.requires_grad = False
+            if not is_last:
+                downs.append(Downsample(pre_channel).to(device))
+                feat_channels.append(pre_channel)
+                now_res = now_res//2
+                # if ind < 5:
+                #     for p in downs[-1].parameters():
+                #         p.requires_grad = False
+
+        self.downs = nn.ModuleList(downs)
+
+        self.mid = nn.ModuleList([
+            ResnetBlocWithAttn(pre_channel, pre_channel, noise_level_emb_dim=noise_level_channel, norm_groups=norm_groups,
+                               dropout=dropout, with_attn=True).to(devices[1]),
+            ResnetBlocWithAttn(pre_channel, pre_channel, noise_level_emb_dim=noise_level_channel, norm_groups=norm_groups,
+                               dropout=dropout, with_attn=False).to(devices[1])
+        ])
+
+        ups = []
+        for ind in reversed(range(num_mults)):
+            if ind < 1:
+                device = devices[0]
+            elif ind < 4:
+                device = devices[1]
+            else:
+                device = devices[2]
+            is_last = (ind < 1)
+            use_attn = (now_res in attn_res)
+            channel_mult = inner_channel * channel_mults[ind]
+            for _ in range(0, res_blocks+1):
+                ups.append(ResnetBlocWithAttn(
+                    pre_channel+feat_channels.pop(), channel_mult, noise_level_emb_dim=noise_level_channel, norm_groups=norm_groups,
+                        dropout=dropout, with_attn=use_attn).to(device))
+                pre_channel = channel_mult
+                # if ind < 5:
+                #     for p in ups[-1].parameters():
+                #         p.requires_grad = False
+            if not is_last:
+                ups.append(Upsample(pre_channel).to(device))
+                now_res = now_res*2
+                # if ind < 5:
+                #     for p in ups[-1].parameters():
+                #         p.requires_grad = False
+
+        self.ups = nn.ModuleList(ups)
+
+        self.final_conv = Block(pre_channel, default(out_channel, in_channel), groups=norm_groups).to(devices[1])
+        
+
+    def get_device(self, module):
+        for para in module.parameters():
+            device = para.device
+            return device
+
+    def forward(self, x, time):
+        device0 = x.device
+        t = self.noise_level_mlp(time.to(self.get_device(self.noise_level_mlp))) if exists(
+            self.noise_level_mlp) else None
+
+        feats = []
+        for i, layer in enumerate(self.downs):
+            x = x.to(self.get_device(layer))
+            t = t.to(self.get_device(layer))
+            if isinstance(layer, ResnetBlocWithAttn):
+                x = layer(x, t)
+            else:
+                x = layer(x)
+            feats.append(x)
+
+        for i, layer in enumerate(self.mid):
+            x = x.to(self.get_device(layer))
+            t = t.to(self.get_device(layer))
+            if isinstance(layer, ResnetBlocWithAttn):
+                x = layer(x, t)
+            else:
+                x = layer(x)
+
+        for i, layer in enumerate(self.ups):
+            x = x.to(self.get_device(layer))
+            t = t.to(self.get_device(layer))
+            if isinstance(layer, ResnetBlocWithAttn):
+                x = layer(torch.cat((x, feats.pop().to(self.get_device(layer))), dim=1), t)
+            else:
+                x = layer(x)
+
+        x = x.to(self.get_device(self.final_conv))
+        return self.final_conv(x).to(device0)

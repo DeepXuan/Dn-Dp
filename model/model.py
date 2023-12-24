@@ -8,18 +8,26 @@ import model.networks as networks
 from .base_model import BaseModel
 logger = logging.getLogger('base')
 
+def get_device(module):
+    for para in module.parameters():
+        device = para.device
+        return device
 
 class DDPM(BaseModel):
     def __init__(self, opt):
         super(DDPM, self).__init__(opt)
         # define network and load pretrained models
-        self.netG = self.set_device(networks.define_G(opt))
+        self.opt = opt
+        self.netG, Unet = networks.define_G(opt)
+        self.netG = self.set_device(self.netG)
+        self.netG.denoise_fn = Unet.to(self.device)
         self.schedule_phase = None
 
         # set loss and load resume state
         self.set_loss()
         self.set_new_noise_schedule(
-            opt['model']['beta_schedule']['train'], schedule_phase='train')
+            opt['model']['beta_schedule']['train'], schedule_phase='train')   
+
         if self.opt['phase'] == 'train':
             self.netG.train()
             # find the parameters to optimize
@@ -34,9 +42,9 @@ class DDPM(BaseModel):
                         logger.info(
                             'Params [{:s}] initialized to 0 and will optimize.'.format(k))
             else:
-                optim_params = list(self.netG.parameters())
+                optim_params = list(self.netG.denoise_fn.parameters())
 
-            self.optG = torch.optim.Adam(
+            self.optG = torch.optim.AdamW(
                 optim_params, lr=opt['train']["optimizer"]["lr"])
             self.log_dict = OrderedDict()
         self.load_network1()
@@ -56,6 +64,12 @@ class DDPM(BaseModel):
 
         # set log
         self.log_dict['l_pix'] = l_pix.item()
+
+    def adjust_learning_rate(self, epoch, current_step, lr_anneal_steps):
+        frac_done = current_step / lr_anneal_steps
+        lr = self.opt['train']["optimizer"]["lr"] * (1 - frac_done)
+        for param_group in self.optG.param_groups:
+            param_group['lr'] = lr
 
     def test(self, *args, continous=False, ddim=False):
         self.netG.eval()
@@ -186,4 +200,3 @@ class DDPM(BaseModel):
                 network = network.module
             network.load_state_dict(torch.load(
                 load_path), strict=(not self.opt['model']['finetune_norm']))
-  

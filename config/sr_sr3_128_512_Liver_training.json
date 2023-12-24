@@ -1,0 +1,100 @@
+{
+    "name": "Liver_128_512_sr3_x0_and_epsilon",
+    "phase": "train", // train or val
+    "gpu_ids": [
+        0
+    ],
+    "path": { //set the path
+        "log": "logs",
+        "tb_logger": "tb_logger",
+        "results": "results",
+        "checkpoint": "checkpoint",
+        "resume_state": null
+    },
+    "datasets": {
+        "train": {
+            "name": "Liver",
+            "mode": "LRHR", // no use
+            "dataroot": "F:\\CT_png\\LDCT_full_png/LDCT_full_png_Liver",
+            "datatype": "img", //no use
+            "exclude_patients": ["L286", "L291", "L310", "L333", "L506"],
+            "l_resolution": 128, // low resolution need to super_resolution
+            "r_resolution": 512, // high resolution
+            "patch_n": 2,
+            "batch_size": 8, // 32
+            "num_workers": 8,
+            "use_shuffle": true,
+            "data_len": -1 // -1 represents all data used in train
+        },
+        "val": {
+            "name": "Liver", //no use
+            "mode": "LRHR", // no use
+            "dataroot": "F:\\CT_png\\AAPM_full_png",
+            "datatype": "img", //no use
+            "include_patients": ["L506"],
+            "l_resolution": 128,
+            "r_resolution": 512,
+            "patch_n": 2,
+            "data_len": 5
+        }
+    },
+    "model": {
+        "which_model_G": "sr3",
+        "mean_type": "x0_and_epsilon", // Section 4 in https://arxiv.org/abs/2202.00512
+        "loss_type": "l2",
+        "finetune_norm": false,
+        "unet": {
+            "in_channel": 2,
+            "out_channel": 2,
+            "inner_channel": 64,
+            "channel_multiplier": [
+                1,
+                2,
+                4,
+                8,
+                8
+            ],
+            "attn_res": [
+                16, 8
+            ],
+            "res_blocks": 2,
+            "dropout": 0.2,
+            "patch_n": 2, // https://arxiv.org/abs/2207.04316
+            "patch_n_cond": 1
+        },
+        "beta_schedule": { // use munual beta_schedule for acceleration
+            "train": {
+                "schedule": "linear",
+                "n_timestep": 2000,
+                "linear_start": 1e-6, // 1e-6
+                "linear_end": 1e-2 // 1e-2
+            },
+            "val": {
+                "schedule": "linear",
+                "n_timestep": 2000,
+                "linear_start": 1e-6,
+                "linear_end": 1e-2
+            }
+        },
+        "diffusion": {
+            "image_size": 512,
+            "channels": 1, //sample channel
+            "conditional": true // unconditional generation or unconditional generation(super_resolution)
+        }
+    },
+    "train": {
+        "n_iter": 100000,
+        "val_freq": 1e4, //1e4
+        "save_checkpoint_freq": 1e4,
+        "print_freq": 200,
+        "optimizer": {
+            "type": "adamw",
+            "lr": 1e-4
+        },
+        "ema_scheduler": { // not used now
+            "step_start_ema": 5000,
+            "update_ema_every": 1,
+            "ema_decay": 0.9999
+        }
+    }
+}

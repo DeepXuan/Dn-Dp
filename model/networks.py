@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 from torch.nn import modules
+import sys
+sys.path.append("model")
+
 logger = logging.getLogger('base')
 ####################
 # initialize
@@ -86,8 +89,10 @@ def define_G(opt):
         from .ddpm_modules import diffusion, unet
     elif model_opt['which_model_G'] == 'sr3':
         from .sr3_modules import diffusion, unet
+
     if ('norm_groups' not in model_opt['unet']) or model_opt['unet']['norm_groups'] is None:
         model_opt['unet']['norm_groups']=32
+
     model = unet.UNet(
         in_channel=model_opt['unet']['in_channel'],
         out_channel=model_opt['unet']['out_channel'],
@@ -97,20 +102,36 @@ def define_G(opt):
         attn_res=model_opt['unet']['attn_res'],
         res_blocks=model_opt['unet']['res_blocks'],
         dropout=model_opt['unet']['dropout'],
-        image_size=model_opt['diffusion']['image_size']
+        image_size=model_opt['diffusion']['image_size'],
+
+        patch_n=model_opt['unet']['patch_n'],
+        patch_n_cond=model_opt['unet']['patch_n_cond'] if 'patch_n_cond' in model_opt['unet'] else 1
     )
+    # model = unet.UNet_parallel(
+    #     in_channel=model_opt['unet']['in_channel'],
+    #     out_channel=model_opt['unet']['out_channel'],
+    #     norm_groups=model_opt['unet']['norm_groups'],
+    #     inner_channel=model_opt['unet']['inner_channel'],
+    #     channel_mults=model_opt['unet']['channel_multiplier'],
+    #     attn_res=model_opt['unet']['attn_res'],
+    #     res_blocks=model_opt['unet']['res_blocks'],
+    #     dropout=model_opt['unet']['dropout'],
+    #     image_size=model_opt['diffusion']['image_size']
+    # )
+
     netG = diffusion.GaussianDiffusion(
         model,
         image_size=model_opt['diffusion']['image_size'],
         channels=model_opt['diffusion']['channels'],
-        loss_type='l1',    # L1 or L2
+        loss_type=model_opt['loss_type'] if 'loss_type' in model_opt else 'l2',    # L1 or L2
+        mean_type=model_opt['mean_type'], # 'x0' or 'epsilon'
         conditional=model_opt['diffusion']['conditional'],
         schedule_opt=model_opt['beta_schedule']['train']
     )
     if opt['phase'] == 'train':
         # init_weights(netG, init_type='kaiming', scale=0.1)
         init_weights(netG, init_type='orthogonal')
-    if opt['gpu_ids'] and opt['distributed']:
-        assert torch.cuda.is_available()
-        netG = nn.DataParallel(netG)
-    return netG
+    # if opt['gpu_ids'] and opt['distributed']:
+    #     assert torch.cuda.is_available()
+    #     netG = nn.DataParallel(netG)
+    return netG, model

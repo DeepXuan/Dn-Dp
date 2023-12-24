@@ -103,7 +103,7 @@ if __name__ == "__main__":
         cond = torch.cat([cond]*mean_num) if cond_folder is not None else None
 
         diffusion.inversion(input, cond, timesteps, ddim_eta, 
-                            batch_size=n*mean_num, ddim=if_ddim, lambda1=lam0, a=a, b=b, c=c, resume=resume, mode=mode, continous=False)
+                            batch_size=n*mean_num, ddim=if_ddim, lambda1=torch.full(input.shape, lam0).to(input.device), a=a, b=b, c=c, resume=resume, mode=mode, continous=False)
    
         visuals = diffusion.get_current_visuals(sample=True)
 

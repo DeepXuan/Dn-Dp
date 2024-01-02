@@ -9,6 +9,7 @@
     },
     "model": {
         "which_model_G": "sr3", // use the ddpm or sr3 network structure
+        "mean_type": "epsilon",
         "finetune_norm": false,
         "unet": {
             "in_channel": 2, //6
@@ -28,7 +29,9 @@
                 // 16
             ],
             "res_blocks": 5,
-            "dropout": 0
+            "dropout": 0,
+            "patch_n": 1,
+            "patch_n_cond": 1
         },
         "beta_schedule": { // use munual beta_schedule for acceleration
             "train": {

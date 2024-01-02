@@ -40,7 +40,7 @@
     },
     "model": {
         "which_model_G": "sr3",
-        "mean_type": "x0_and_epsilon", // Section 4 in https://arxiv.org/abs/2202.00512
+        "mean_type": "x0_and_epsilon", // "epsilon", "x0", "mu", "v", "x0_and_epsilon", when using "x0_and_epsilon", out_channel=2 (Section 4 in https://arxiv.org/abs/2202.00512)
         "loss_type": "l2",
         "finetune_norm": false,
         "unet": {

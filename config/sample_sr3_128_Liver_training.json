@@ -38,7 +38,7 @@
     },
     "model": {
         "which_model_G": "sr3", // use the ddpm or sr3 network structure
-        "mean_type": "epsilon",
+        "mean_type": "epsilon", // "epsilon", "x0", "mu", "v", "x0_and_epsilon", when using "x0_and_epsilon", out_channel=2
         "finetune_norm": false,
         "unet": {
             "in_channel": 1,

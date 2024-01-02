@@ -406,7 +406,7 @@ class GaussianDiffusion(nn.Module):
                 noisy_t = self.q_sample(noisy, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1))
                 
                 # lam = torch.full(shape, lambda1).to(device) * self.sqrt_alphas_cumprod[timestep_map[i]]
-                lam = lambda1
+                lam = lambda1 * self.sqrt_alphas_cumprod[timestep_map[i]]
                 
                 out = self.ddim_sample(img, i, timestep_map, eta)
                 if i > 0:
@@ -456,7 +456,7 @@ class GaussianDiffusion(nn.Module):
                 noisy_t = self.q_sample(noisy, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1))
         
                 # lam = torch.full(shape, lambda1).to(device) * self.sqrt_alphas_cumprod[timestep_map[i]]
-                lam = lambda1
+                lam = lambda1 * self.sqrt_alphas_cumprod[timestep_map[i]]
 
                 out = self.ddim_sample(img, i, timestep_map, eta, condition_x=x)
                 if i > 0:
@@ -529,7 +529,7 @@ class GaussianDiffusion(nn.Module):
                 continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(bs, -1)
                 noisy_t = self.q_sample(noisy, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1))
                 # lam = torch.full(shape, lambda1).to(device) * self.sqrt_alphas_cumprod[i]
-                lam = lambda1
+                lam = lambda1 * self.sqrt_alphas_cumprod[i]
                 out = self.p_sample(img, i)
                 if i > 0:
                     img = (noisy_t + lam / torch.exp(0.5 * out["log_variance"]) * out["mean"]) / (1 + lam / torch.exp(0.5 * out["log_variance"]))
@@ -587,7 +587,7 @@ class GaussianDiffusion(nn.Module):
                 
                 noisy_t = self.q_sample(noisy, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1))
                 # lam = torch.full(shape, lambda1).to(device) * self.sqrt_alphas_cumprod[i]
-                lam = lambda1
+                lam = lambda1 * self.sqrt_alphas_cumprod[i]
                 out = self.p_sample(img, i, condition_x=x)
                 if i > 0:
                     img = (noisy_t + lam / torch.exp(0.5 * out["log_variance"]) * out["mean"]) / (1 + lam / torch.exp(0.5 * out["log_variance"]))
